@@ -1,5 +1,8 @@
+import base64
 import hashlib
 import hmac
+import io
+import json
 import secrets as py_secrets
 import time as time_module
 from datetime import datetime, timedelta, time
@@ -8,6 +11,7 @@ from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 import streamlit as st
+from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 from streamlit_calendar import calendar
 from google.oauth2 import service_account
@@ -52,7 +56,7 @@ LEMBRETES_OPCOES = {
     ],
 }
 
-# Constantes do cofre de credenciais no Google Calendar (ano 2099, fora da janela de exibição)
+# Constantes do cofre de credenciais e perfil no Google Calendar (ano 2099)
 VAULT_EVENT_TAG = "APP_AUTH_VAULT_V1"
 VAULT_TIME_MIN = "2099-01-01T00:00:00Z"
 VAULT_TIME_MAX = "2099-01-02T00:00:00Z"
@@ -119,14 +123,14 @@ def get_gemini_client():
     )
 
 
-# --- COFRE DE SENHA PERSISTENTE NO GOOGLE CALENDAR ---
+# --- COFRE DE SENHA E PERFIL PERSISTENTE NO GOOGLE CALENDAR ---
 def _gerar_hash_senha(senha: str, salt: str) -> str:
     dk = hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), salt.encode("utf-8"), 120_000)
     return dk.hex()
 
 
 def _obter_evento_cofre():
-    """Busca o registro oculto de senha na agenda pessoal."""
+    """Busca o registro oculto de senha e perfil na agenda pessoal."""
     service = get_calendar_service()
     cal_id = CALENDARS["Pessoal"]["id"]
     res = (
@@ -144,28 +148,68 @@ def _obter_evento_cofre():
     return (cal_id, items[0]) if items else (cal_id, None)
 
 
-def salvar_nova_senha_cofre(nova_senha: str):
-    """Salva o hash PBKDF2-SHA256 da nova senha de forma persistente."""
+def _ler_dados_cofre() -> dict:
+    """Lê os dados de perfil (nome e foto Base64) armazenados na descrição do cofre."""
+    try:
+        _, evento_existente = _obter_evento_cofre()
+        if evento_existente:
+            desc = evento_existente.get("description", "")
+            if desc.startswith("{"):
+                return json.loads(desc)
+    except Exception:
+        pass
+    return {}
+
+
+@st.cache_data(ttl=300)
+def carregar_perfil_usuario() -> dict:
+    dados = _ler_dados_cofre()
+    return {
+        "nome": dados.get("nome_exibicao", ""),
+        "avatar_b64": dados.get("avatar_b64", ""),
+    }
+
+
+def _gravar_evento_cofre(
+    pwd_salt: Optional[str] = None,
+    pwd_hash: Optional[str] = None,
+    nome_exibicao: Optional[str] = None,
+    avatar_b64: Optional[str] = None,
+):
+    """Atualiza senha e/ou dados de perfil preservando os campos já salvos no cofre."""
     service = get_calendar_service()
     cal_id, evento_existente = _obter_evento_cofre()
-    salt = py_secrets.token_hex(16)
-    pwd_hash = _gerar_hash_senha(nova_senha, salt)
+
+    priv_atual = {}
+    dados_desc_atual = {}
+    if evento_existente:
+        priv_atual = dict(evento_existente.get("extendedProperties", {}).get("private", {}))
+        desc_raw = evento_existente.get("description", "")
+        if desc_raw.startswith("{"):
+            try:
+                dados_desc_atual = json.loads(desc_raw)
+            except Exception:
+                dados_desc_atual = {}
+
+    priv_atual["vault_tag"] = VAULT_EVENT_TAG
+    if pwd_salt is not None and pwd_hash is not None:
+        priv_atual["pwd_salt"] = pwd_salt
+        priv_atual["pwd_hash"] = pwd_hash
+
+    if nome_exibicao is not None:
+        dados_desc_atual["nome_exibicao"] = nome_exibicao
+    if avatar_b64 is not None:
+        dados_desc_atual["avatar_b64"] = avatar_b64
 
     corpo = {
-        "summary": "[Sistema] Registro de Segurança",
-        "description": "Registro técnico interno do aplicativo Meus agendamentos. Não excluir.",
+        "summary": "[Sistema] Registro de Segurança e Perfil",
+        "description": json.dumps(dados_desc_atual, ensure_ascii=False),
         "visibility": "private",
         "transparency": "transparent",
         "start": {"dateTime": "2099-01-01T00:00:00-03:00", "timeZone": TIMEZONE},
         "end": {"dateTime": "2099-01-01T00:05:00-03:00", "timeZone": TIMEZONE},
         "reminders": {"useDefault": False, "overrides": []},
-        "extendedProperties": {
-            "private": {
-                "vault_tag": VAULT_EVENT_TAG,
-                "pwd_salt": salt,
-                "pwd_hash": pwd_hash,
-            }
-        },
+        "extendedProperties": {"private": priv_atual},
     }
 
     if evento_existente:
@@ -174,6 +218,24 @@ def salvar_nova_senha_cofre(nova_senha: str):
         ).execute(num_retries=3)
     else:
         service.events().insert(calendarId=cal_id, body=corpo).execute(num_retries=3)
+
+    carregar_perfil_usuario.clear()
+
+
+def salvar_nova_senha_cofre(nova_senha: str):
+    salt = py_secrets.token_hex(16)
+    pwd_hash = _gerar_hash_senha(nova_senha, salt)
+    _gravar_evento_cofre(pwd_salt=salt, pwd_hash=pwd_hash)
+
+
+def processar_imagem_avatar(arquivo_upload) -> str:
+    """Redimensiona e comprime a foto enviada para um avatar leve em Base64."""
+    img = Image.open(arquivo_upload)
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    img = ImageOps.fit(img, (160, 160), method=Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=82, optimize=True)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def validar_senha_usuario(senha_digitada: str) -> bool:
@@ -292,7 +354,7 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE) ---
+# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE + AVATAR) ---
 st.markdown(
     """
     <style>
@@ -306,6 +368,44 @@ st.markdown(
         padding: 0.9rem 1.1rem;
         border-radius: 0.75rem;
     }
+    .perfil-header {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 0.35rem;
+    }
+    .perfil-avatar {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #2563EB;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .perfil-avatar-placeholder {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563EB, #16A34A);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.25rem;
+    }
+    .perfil-saudacao {
+        font-size: 0.95rem;
+        opacity: 0.85;
+        margin: 0;
+        line-height: 1.2;
+    }
+    .perfil-nome {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1.3;
+    }
     /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
         .block-container {
@@ -317,6 +417,14 @@ st.markdown(
             font-size: 1.55rem !important;
             margin-bottom: 0.5rem !important;
         }
+        .perfil-avatar, .perfil-avatar-placeholder {
+            width: 44px;
+            height: 44px;
+            font-size: 1.05rem;
+        }
+        .perfil-nome {
+            font-size: 1.05rem;
+        }
         div[data-testid="stMetric"] {
             padding: 0.65rem 0.85rem !important;
         }
@@ -326,7 +434,6 @@ st.markdown(
         div[data-testid="stMetricLabel"] {
             font-size: 0.8rem !important;
         }
-        /* Garante que o calendário não ultrapasse a largura do aparelho */
         iframe[title="streamlit_calendar.calendar"] {
             width: 100% !important;
             min-height: 460px !important;
@@ -535,6 +642,53 @@ def gerar_link_rota_maps(destino: str) -> str:
     return f"https://www.google.com/maps/dir/?api=1&destination={destino_codificado}&travelmode=driving"
 
 
+# --- JANELA MODAL DE PERFIL (NOME E FOTO) ---
+@st.dialog("Meu Perfil")
+def abrir_modal_perfil():
+    perfil_atual = carregar_perfil_usuario()
+    st.caption("Personalize o nome e a foto exibidos no topo do painel.")
+
+    if perfil_atual["avatar_b64"]:
+        st.markdown(
+            f'<div style="text-align:center; margin-bottom: 0.75rem;">'
+            f'<img src="data:image/jpeg;base64,{perfil_atual["avatar_b64"]}" class="perfil-avatar" style="width:84px; height:84px;">'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    with st.form("form_perfil_usuario", clear_on_submit=False):
+        novo_nome = st.text_input(
+            "Seu nome de exibição",
+            value=perfil_atual["nome"],
+            placeholder="Ex.: José Mário Júnior",
+        )
+        nova_foto = st.file_uploader(
+            "Enviar ou trocar foto (PNG, JPG ou WEBP)",
+            type=["png", "jpg", "jpeg", "webp"],
+        )
+        remover_foto = st.checkbox("Remover foto atual", value=False)
+        salvar_perfil_btn = st.form_submit_button("Salvar Perfil", type="primary", use_container_width=True)
+
+        if salvar_perfil_btn:
+            try:
+                with st.spinner("Salvando perfil..."):
+                    avatar_final = perfil_atual["avatar_b64"]
+                    if remover_foto:
+                        avatar_final = ""
+                    elif nova_foto is not None:
+                        avatar_final = processar_imagem_avatar(nova_foto)
+
+                    _gravar_evento_cofre(
+                        nome_exibicao=novo_nome.strip(),
+                        avatar_b64=avatar_final,
+                    )
+                st.success("Perfil atualizado!")
+                time_module.sleep(0.8)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar perfil: {e}")
+
+
 # --- JANELA MODAL DE ALTERAÇÃO DE SENHA ---
 @st.dialog("Alterar Senha de Acesso")
 def abrir_modal_alterar_senha():
@@ -619,8 +773,9 @@ def abrir_modal_evento(ev_clicado: dict):
                 st.error(f"Erro ao excluir: {e}")
 
 
-# --- CARREGA EVENTOS ANTES DA BARRA LATERAL PARA MANTER ESTADO SINCRONIZADO ---
+# --- CARREGA EVENTOS E PERFIL ---
 eventos = carregar_eventos()
+perfil = carregar_perfil_usuario()
 ids_eventos_ativos = {e["id"] for e in eventos}
 
 if (
@@ -694,6 +849,7 @@ with st.sidebar:
 
     if st.button("🔄 Sincronizar Google Agenda", use_container_width=True):
         carregar_eventos.clear()
+        carregar_perfil_usuario.clear()
         st.session_state.data_foco_calendario = datetime.now(TZ).strftime("%Y-%m-%d")
         st.session_state.cal_reset_counter += 1
         st.rerun()
@@ -733,7 +889,10 @@ with st.sidebar:
                     st.rerun()
 
     st.markdown("---")
-    col_pwd, col_out = st.columns(2)
+    col_perf, col_pwd, col_out = st.columns(3)
+    with col_perf:
+        if st.button("👤 Perfil", use_container_width=True):
+            abrir_modal_perfil()
     with col_pwd:
         if st.button("🔐 Senha", use_container_width=True):
             abrir_modal_alterar_senha()
@@ -743,7 +902,31 @@ with st.sidebar:
             st.rerun()
 
 
-# --- ÁREA PRINCIPAL: KPIS, ACESSO RÁPIDO MOBILE E CALENDÁRIO ---
+# --- ÁREA PRINCIPAL: PERFIL DO USUÁRIO, TÍTULO, KPIS E CALENDÁRIO ---
+nome_usuario = perfil["nome"].strip()
+avatar_b64 = perfil["avatar_b64"].strip()
+
+if nome_usuario or avatar_b64:
+    if avatar_b64:
+        avatar_html = f'<img src="data:image/jpeg;base64,{avatar_b64}" class="perfil-avatar" alt="Foto do usuário">'
+    else:
+        inicial = nome_usuario[0].upper() if nome_usuario else "U"
+        avatar_html = f'<div class="perfil-avatar-placeholder">{inicial}</div>'
+
+    texto_nome = nome_usuario if nome_usuario else "Bem-vindo"
+    st.markdown(
+        f"""
+        <div class="perfil-header">
+            {avatar_html}
+            <div>
+                <p class="perfil-saudacao">Olá,</p>
+                <p class="perfil-nome">{texto_nome}</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 st.title("Meus agendamentos")
 
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
