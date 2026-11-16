@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import secrets as py_secrets
 import time as time_module
 from datetime import datetime, timedelta, time
 from typing import Literal, Optional
@@ -16,74 +17,6 @@ from google.genai import types
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Meus agendamentos", page_icon="🗓️", layout="wide")
-
-
-# --- CONTROLE DE AUTENTICAÇÃO ---
-def verificar_autenticacao() -> bool:
-    """Exibe a tela de login até que usuário e senha válidos sejam informados."""
-    if st.session_state.get("autenticado", False):
-        return True
-
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            padding-top: 4rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    _, col_central, _ = st.columns([1.2, 1.4, 1.2])
-    with col_central:
-        with st.container(border=True):
-            st.markdown("### 🔒 Acesso Restrito")
-            st.caption("Informe suas credenciais para acessar **Meus agendamentos**.")
-
-            with st.form("form_login", clear_on_submit=False):
-                usuario_digitado = st.text_input("Usuário", placeholder="Digite seu usuário")
-                senha_digitada = st.text_input("Senha", type="password", placeholder="Digite sua senha")
-                entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
-
-                if entrar:
-                    usuario_correto = str(st.secrets.get("APP_USUARIO", "agenda"))
-                    senha_correta = str(st.secrets.get("APP_SENHA", "123456"))
-
-                    u_ok = hmac.compare_digest(usuario_digitado.strip(), usuario_correto)
-                    s_ok = hmac.compare_digest(senha_digitada, senha_correta)
-
-                    if u_ok and s_ok:
-                        st.session_state["autenticado"] = True
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou senha incorretos.")
-
-    return False
-
-
-if not verificar_autenticacao():
-    st.stop()
-
-
-# --- ESTILOS DO DASHBOARD ---
-st.markdown(
-    """
-    <style>
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    div[data-testid="stMetric"] {
-        background-color: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 1rem 1.25rem;
-        border-radius: 0.75rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 TIMEZONE = "America/Bahia"
 TZ = ZoneInfo(TIMEZONE)
@@ -114,6 +47,11 @@ LEMBRETES_OPCOES = {
     ],
 }
 
+# Constantes do cofre de credenciais no Google Calendar (ano 2099, fora da janela de exibição)
+VAULT_EVENT_TAG = "APP_AUTH_VAULT_V1"
+VAULT_TIME_MIN = "2099-01-01T00:00:00Z"
+VAULT_TIME_MAX = "2099-01-02T00:00:00Z"
+
 # Inicializa estados da sessão
 if "ultimo_evento_criado" not in st.session_state:
     st.session_state.ultimo_evento_criado = None
@@ -123,6 +61,8 @@ if "data_foco_calendario" not in st.session_state:
     st.session_state.data_foco_calendario = datetime.now(TZ).strftime("%Y-%m-%d")
 if "cal_reset_counter" not in st.session_state:
     st.session_state.cal_reset_counter = 0
+if "modo_recuperacao_senha" not in st.session_state:
+    st.session_state.modo_recuperacao_senha = False
 
 
 # --- SCHEMA ESTRUTURADO PARA O GEMINI ---
@@ -174,6 +114,197 @@ def get_gemini_client():
     )
 
 
+# --- COFRE DE SENHA PERSISTENTE NO GOOGLE CALENDAR ---
+def _gerar_hash_senha(senha: str, salt: str) -> str:
+    dk = hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), salt.encode("utf-8"), 120_000)
+    return dk.hex()
+
+
+def _obter_evento_cofre():
+    """Busca o registro oculto de senha na agenda pessoal."""
+    service = get_calendar_service()
+    cal_id = CALENDARS["Pessoal"]["id"]
+    res = (
+        service.events()
+        .list(
+            calendarId=cal_id,
+            timeMin=VAULT_TIME_MIN,
+            timeMax=VAULT_TIME_MAX,
+            privateExtendedProperty=f"vault_tag={VAULT_EVENT_TAG}",
+            singleEvents=True,
+        )
+        .execute(num_retries=3)
+    )
+    items = res.get("items", [])
+    return (cal_id, items[0]) if items else (cal_id, None)
+
+
+def salvar_nova_senha_cofre(nova_senha: str):
+    """Salva o hash PBKDF2-SHA256 da nova senha de forma persistente."""
+    service = get_calendar_service()
+    cal_id, evento_existente = _obter_evento_cofre()
+    salt = py_secrets.token_hex(16)
+    pwd_hash = _gerar_hash_senha(nova_senha, salt)
+
+    corpo = {
+        "summary": "[Sistema] Registro de Segurança",
+        "description": "Registro técnico interno do aplicativo Meus agendamentos. Não excluir.",
+        "visibility": "private",
+        "transparency": "transparent",
+        "start": {"dateTime": "2099-01-01T00:00:00-03:00", "timeZone": TIMEZONE},
+        "end": {"dateTime": "2099-01-01T00:05:00-03:00", "timeZone": TIMEZONE},
+        "reminders": {"useDefault": False, "overrides": []},
+        "extendedProperties": {
+            "private": {
+                "vault_tag": VAULT_EVENT_TAG,
+                "pwd_salt": salt,
+                "pwd_hash": pwd_hash,
+            }
+        },
+    }
+
+    if evento_existente:
+        service.events().update(
+            calendarId=cal_id, eventId=evento_existente["id"], body=corpo
+        ).execute(num_retries=3)
+    else:
+        service.events().insert(calendarId=cal_id, body=corpo).execute(num_retries=3)
+
+
+def validar_senha_usuario(senha_digitada: str) -> bool:
+    """Valida a senha contra o cofre persistente; se não houver alteração salva, usa st.secrets."""
+    try:
+        _, evento_cofre = _obter_evento_cofre()
+        if evento_cofre:
+            priv = evento_cofre.get("extendedProperties", {}).get("private", {})
+            salt = priv.get("pwd_salt", "")
+            hash_salvo = priv.get("pwd_hash", "")
+            if salt and hash_salvo:
+                hash_tentativa = _gerar_hash_senha(senha_digitada, salt)
+                return hmac.compare_digest(hash_tentativa, hash_salvo)
+    except Exception:
+        pass
+
+    senha_inicial = str(st.secrets.get("APP_SENHA", "123456"))
+    return hmac.compare_digest(senha_digitada, senha_inicial)
+
+
+# --- CONTROLE DE AUTENTICAÇÃO E RECUPERAÇÃO ---
+def verificar_autenticacao() -> bool:
+    """Exibe a tela de login e o fluxo de redefinição de senha por PIN Mestre."""
+    if st.session_state.get("autenticado", False):
+        return True
+
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            padding-top: 4rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    _, col_central, _ = st.columns([1.2, 1.4, 1.2])
+    with col_central:
+        with st.container(border=True):
+            if not st.session_state.modo_recuperacao_senha:
+                st.markdown("### 🔒 Acesso Restrito")
+                st.caption("Informe suas credenciais para acessar **Meus agendamentos**.")
+
+                with st.form("form_login", clear_on_submit=False):
+                    usuario_digitado = st.text_input("Usuário", placeholder="Digite seu usuário")
+                    senha_digitada = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+                    entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+
+                    if entrar:
+                        usuario_correto = str(st.secrets.get("APP_USUARIO", "agenda"))
+                        u_ok = hmac.compare_digest(usuario_digitado.strip(), usuario_correto)
+                        s_ok = validar_senha_usuario(senha_digitada)
+
+                        if u_ok and s_ok:
+                            st.session_state["autenticado"] = True
+                            st.rerun()
+                        else:
+                            st.error("Usuário ou senha incorretos.")
+
+                st.write("")
+                if st.button("🔑 Esqueci minha senha", use_container_width=True):
+                    st.session_state.modo_recuperacao_senha = True
+                    st.rerun()
+
+            else:
+                st.markdown("### 🔑 Redefinir Senha")
+                st.caption("Informe seu usuário e o **PIN Mestre de Recuperação** para cadastrar uma nova senha.")
+
+                with st.form("form_recuperar_senha", clear_on_submit=True):
+                    usuario_rec = st.text_input("Usuário", placeholder="Ex.: agenda")
+                    pin_digitado = st.text_input(
+                        "PIN Mestre de Recuperação",
+                        type="password",
+                        placeholder="Digite o PIN configurado",
+                    )
+                    nova_senha_rec = st.text_input("Nova senha (mín. 4 caracteres)", type="password")
+                    confirmar_senha_rec = st.text_input("Confirmar nova senha", type="password")
+                    salvar_rec = st.form_submit_button("Salvar Nova Senha", type="primary", use_container_width=True)
+
+                    if salvar_rec:
+                        usuario_correto = str(st.secrets.get("APP_USUARIO", "agenda"))
+                        pin_correto = str(st.secrets.get("RECOVERY_PIN", "2026"))
+
+                        u_ok = hmac.compare_digest(usuario_rec.strip(), usuario_correto)
+                        pin_ok = hmac.compare_digest(pin_digitado.strip(), pin_correto)
+
+                        if not u_ok or not pin_ok:
+                            st.error("Usuário ou PIN Mestre inválido.")
+                        elif len(nova_senha_rec) < 4:
+                            st.warning("A nova senha deve ter pelo menos 4 caracteres.")
+                        elif nova_senha_rec != confirmar_senha_rec:
+                            st.warning("A confirmação de senha não confere.")
+                        else:
+                            try:
+                                with st.spinner("Atualizando senha..."):
+                                    salvar_nova_senha_cofre(nova_senha_rec)
+                                st.success("Senha redefinida com sucesso! Faça login com a nova senha.")
+                                st.session_state.modo_recuperacao_senha = False
+                                time_module.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Não foi possível salvar a nova senha: {e}")
+
+                st.write("")
+                if st.button("← Voltar para o Login", use_container_width=True):
+                    st.session_state.modo_recuperacao_senha = False
+                    st.rerun()
+
+    return False
+
+
+if not verificar_autenticacao():
+    st.stop()
+
+
+# --- ESTILOS DO DASHBOARD ---
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    div[data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1rem 1.25rem;
+        border-radius: 0.75rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 # --- FUNÇÕES DE AGENDA ---
 @st.cache_data(ttl=120)
 def carregar_eventos():
@@ -198,6 +329,11 @@ def carregar_eventos():
                 .execute(num_retries=3)
             )
             for item in events_result.get("items", []):
+                # Ignora qualquer eventual registro técnico do cofre
+                priv_props = item.get("extendedProperties", {}).get("private", {})
+                if priv_props.get("vault_tag") == VAULT_EVENT_TAG:
+                    continue
+
                 start = item["start"].get("dateTime", item["start"].get("date"))
                 end = item["end"].get("dateTime", item["end"].get("date"))
                 todos_eventos.append(
@@ -253,10 +389,8 @@ def criar_evento(
     )
     carregar_eventos.clear()
 
-    # Move a visualização do calendário diretamente para o mês/dia do novo evento
     st.session_state.data_foco_calendario = dt_inicio.strftime("%Y-%m-%d")
 
-    # Guarda referência para o botão "Desfazer"
     st.session_state.ultimo_evento_criado = {
         "event_id": criado["id"],
         "calendar_id": calendar_id,
@@ -271,6 +405,10 @@ def excluir_evento(calendar_id: str, event_id: str):
     service = get_calendar_service()
     service.events().delete(calendarId=calendar_id, eventId=event_id).execute(num_retries=3)
     carregar_eventos.clear()
+
+    ult = st.session_state.get("ultimo_evento_criado")
+    if ult and ult.get("event_id") == event_id:
+        st.session_state.ultimo_evento_criado = None
 
 
 # --- INTERPRETAÇÃO INTELIGENTE COM GEMINI (COM FALLBACK AUTOMÁTICO) ---
@@ -365,6 +503,34 @@ def gerar_link_rota_maps(destino: str) -> str:
     return f"https://www.google.com/maps/dir/?api=1&destination={destino_codificado}&travelmode=driving"
 
 
+# --- JANELA MODAL DE ALTERAÇÃO DE SENHA ---
+@st.dialog("Alterar Senha de Acesso")
+def abrir_modal_alterar_senha():
+    st.caption("A nova senha ficará salva permanentemente na sua conta.")
+    with st.form("form_alterar_senha_interna", clear_on_submit=True):
+        senha_atual = st.text_input("Senha atual", type="password")
+        nova_senha = st.text_input("Nova senha (mín. 4 caracteres)", type="password")
+        confirmar_nova = st.text_input("Confirmar nova senha", type="password")
+        confirmar_btn = st.form_submit_button("Atualizar Senha", type="primary", use_container_width=True)
+
+        if confirmar_btn:
+            if not validar_senha_usuario(senha_atual):
+                st.error("A senha atual está incorreta.")
+            elif len(nova_senha) < 4:
+                st.warning("A nova senha deve ter pelo menos 4 caracteres.")
+            elif nova_senha != confirmar_nova:
+                st.warning("A confirmação não coincide com a nova senha.")
+            else:
+                try:
+                    with st.spinner("Salvando nova senha..."):
+                        salvar_nova_senha_cofre(nova_senha)
+                    st.success("Senha atualizada com sucesso!")
+                    time_module.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar senha: {e}")
+
+
 # --- JANELA MODAL AMPLIADA DE DETALHES DO EVENTO ---
 @st.dialog("Detalhes do Compromisso", width="large")
 def abrir_modal_evento(ev_clicado: dict):
@@ -376,7 +542,6 @@ def abrir_modal_evento(ev_clicado: dict):
     local_txt = props.get("localizacao", "").strip()
     descricao_txt = props.get("descricao", "").strip()
 
-    # Fallback para eventos criados anteriormente sem o campo location preenchido
     destino_maps = local_txt if local_txt else f"{titulo_ev}, Feira de Santana - BA"
 
     cor_badge = "🔵" if categoria_ev == "Profissional" else "🟢"
@@ -420,6 +585,17 @@ def abrir_modal_evento(ev_clicado: dict):
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao excluir: {e}")
+
+
+# --- CARREGA EVENTOS ANTES DA BARRA LATERAL PARA MANTER ESTADO SINCRONIZADO ---
+eventos = carregar_eventos()
+ids_eventos_ativos = {e["id"] for e in eventos}
+
+if (
+    st.session_state.ultimo_evento_criado
+    and st.session_state.ultimo_evento_criado.get("event_id") not in ids_eventos_ativos
+):
+    st.session_state.ultimo_evento_criado = None
 
 
 # --- BARRA LATERAL ---
@@ -525,15 +701,19 @@ with st.sidebar:
                     st.rerun()
 
     st.markdown("---")
-    if st.button("🚪 Sair", use_container_width=True):
-        st.session_state["autenticado"] = False
-        st.rerun()
+    col_pwd, col_out = st.columns(2)
+    with col_pwd:
+        if st.button("🔐 Senha", use_container_width=True):
+            abrir_modal_alterar_senha()
+    with col_out:
+        if st.button("🚪 Sair", use_container_width=True):
+            st.session_state["autenticado"] = False
+            st.rerun()
 
 
 # --- ÁREA PRINCIPAL: KPIS E CALENDÁRIO ---
 st.title("Meus agendamentos")
 
-eventos = carregar_eventos()
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
 
 eventos_hoje = [e for e in eventos if e["start"].startswith(hoje_str)]
