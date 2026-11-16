@@ -16,7 +16,12 @@ from google import genai
 from google.genai import types
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Meus agendamentos", page_icon="🗓️", layout="wide")
+st.set_page_config(
+    page_title="Meus agendamentos",
+    page_icon="🗓️",
+    layout="wide",
+    initial_sidebar_state="auto",
+)
 
 TIMEZONE = "America/Bahia"
 TZ = ZoneInfo(TIMEZONE)
@@ -199,14 +204,16 @@ def verificar_autenticacao() -> bool:
         """
         <style>
         .block-container {
-            padding-top: 4rem;
+            padding-top: 2.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    _, col_central, _ = st.columns([1.2, 1.4, 1.2])
+    _, col_central, _ = st.columns([1, 1.5, 1])
     with col_central:
         with st.container(border=True):
             if not st.session_state.modo_recuperacao_senha:
@@ -285,19 +292,45 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS DO DASHBOARD ---
+# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE) ---
 st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.75rem;
         padding-bottom: 2rem;
     }
     div[data-testid="stMetric"] {
         background-color: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 1rem 1.25rem;
+        padding: 0.9rem 1.1rem;
         border-radius: 0.75rem;
+    }
+    /* Ajustes específicos para telas de celular (largura até 768px) */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 1rem !important;
+            padding-left: 0.65rem !important;
+            padding-right: 0.65rem !important;
+        }
+        h1 {
+            font-size: 1.55rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        div[data-testid="stMetric"] {
+            padding: 0.65rem 0.85rem !important;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 1.35rem !important;
+        }
+        div[data-testid="stMetricLabel"] {
+            font-size: 0.8rem !important;
+        }
+        /* Garante que o calendário não ultrapasse a largura do aparelho */
+        iframe[title="streamlit_calendar.calendar"] {
+            width: 100% !important;
+            min-height: 460px !important;
+        }
     }
     </style>
     """,
@@ -329,7 +362,6 @@ def carregar_eventos():
                 .execute(num_retries=3)
             )
             for item in events_result.get("items", []):
-                # Ignora qualquer eventual registro técnico do cofre
                 priv_props = item.get("extendedProperties", {}).get("private", {})
                 if priv_props.get("vault_tag") == VAULT_EVENT_TAG:
                     continue
@@ -711,7 +743,7 @@ with st.sidebar:
             st.rerun()
 
 
-# --- ÁREA PRINCIPAL: KPIS E CALENDÁRIO ---
+# --- ÁREA PRINCIPAL: KPIS, ACESSO RÁPIDO MOBILE E CALENDÁRIO ---
 st.title("Meus agendamentos")
 
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
@@ -725,13 +757,46 @@ k1.metric("Compromissos Hoje", len(eventos_hoje))
 k2.metric("🔵 Profissional (Período)", prof_count)
 k3.metric("🟢 Pessoal (Período)", pess_count)
 
-st.write("")
+# Barra rápida inline (facilita o uso no celular sem precisar abrir o menu lateral)
+with st.expander("🎙️ Novo agendamento rápido (Voz ou Texto)", expanded=False):
+    col_mob_voz, col_mob_txt = st.columns([1, 1.3])
+    with col_mob_voz:
+        audio_mob = st.audio_input("Gravar áudio", key="mic_input_mobile")
+        if audio_mob is not None:
+            raw_bytes_mob = audio_mob.getvalue()
+            audio_hash_mob = hashlib.md5(raw_bytes_mob).hexdigest()
+            if audio_hash_mob != st.session_state.ultimo_audio_hash:
+                st.session_state.ultimo_audio_hash = audio_hash_mob
+                with st.spinner("Ouvindo e agendando..."):
+                    try:
+                        ev_extraido = processar_entrada_ia(audio_bytes=raw_bytes_mob)
+                        salvar_evento_extraido(ev_extraido)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar áudio: {e}")
+
+    with col_mob_txt:
+        with st.form("form_texto_rapido_mobile", clear_on_submit=True):
+            texto_mob = st.text_input(
+                "Ou escreva o compromisso:",
+                placeholder="Ex.: Dentista sexta às 15h",
+            )
+            if st.form_submit_button("⚡ Agendar Agora", type="primary", use_container_width=True):
+                if texto_mob.strip():
+                    with st.spinner("Agendando..."):
+                        try:
+                            ev_extraido = processar_entrada_ia(texto=texto_mob.strip())
+                            salvar_evento_extraido(ev_extraido)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao interpretar: {e}")
 
 if filtro_cat != "Todas":
     eventos_filtrados = [e for e in eventos if e["extendedProps"]["categoria"] == filtro_cat]
 else:
     eventos_filtrados = eventos
 
+# Configuração responsiva do FullCalendar para caber perfeitamente no celular e no PC
 calendar_options = {
     "editable": False,
     "selectable": True,
@@ -753,12 +818,49 @@ calendar_options = {
     },
     "initialView": "dayGridMonth",
     "locale": "pt-br",
-    "height": 680,
+    "height": "auto",
+    "contentHeight": "auto",
+    "handleWindowResize": True,
+    "dayMaxEvents": 2,
 }
+
+custom_css_calendario = """
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.15rem !important;
+    }
+    .fc .fc-button {
+        padding: 0.25rem 0.55rem !important;
+        font-size: 0.85rem !important;
+    }
+    .fc .fc-daygrid-day-frame {
+        min-height: 58px !important;
+    }
+    @media (max-width: 600px) {
+        .fc .fc-toolbar-title {
+            font-size: 1rem !important;
+        }
+        .fc .fc-col-header-cell-cushion {
+            font-size: 0.75rem !important;
+            padding: 2px !important;
+        }
+        .fc .fc-daygrid-day-number {
+            font-size: 0.75rem !important;
+            padding: 2px 4px !important;
+        }
+        .fc-event-title, .fc-event-time {
+            font-size: 0.7rem !important;
+        }
+    }
+"""
 
 estado_calendario = calendar(
     events=eventos_filtrados,
     options=calendar_options,
+    custom_css=custom_css_calendario,
     callbacks=["eventClick"],
     key=f"cal_{filtro_cat}_{st.session_state.data_foco_calendario}_{st.session_state.cal_reset_counter}",
 )
