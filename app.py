@@ -21,8 +21,7 @@ from google.genai import types
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(
-    page_title="Meus agendamentos",
-    page_icon="🗓️",
+    page_title="My Diaries",
     layout="wide",
     initial_sidebar_state="auto",
 )
@@ -232,9 +231,9 @@ def processar_imagem_avatar(arquivo_upload) -> str:
     """Redimensiona e comprime a foto enviada priorizando o enquadramento do rosto."""
     img = Image.open(arquivo_upload)
     img = ImageOps.exif_transpose(img).convert("RGB")
-    img = ImageOps.fit(img, (180, 180), method=Image.Resampling.LANCZOS, centering=(0.5, 0.25))
+    img = ImageOps.fit(img, (220, 220), method=Image.Resampling.LANCZOS, centering=(0.5, 0.25))
     buffer = io.BytesIO()
-    img.save(buffer, format="JPEG", quality=85, optimize=True)
+    img.save(buffer, format="JPEG", quality=88, optimize=True)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
@@ -279,8 +278,8 @@ def verificar_autenticacao() -> bool:
     with col_central:
         with st.container(border=True):
             if not st.session_state.modo_recuperacao_senha:
-                st.markdown("### 🔒 Acesso Restrito")
-                st.caption("Informe suas credenciais para acessar **Meus agendamentos**.")
+                st.markdown("### Acesso Restrito")
+                st.caption("Informe suas credenciais para acessar **My Diaries**.")
 
                 with st.form("form_login", clear_on_submit=False):
                     usuario_digitado = st.text_input("Usuário", placeholder="Digite seu usuário")
@@ -299,12 +298,12 @@ def verificar_autenticacao() -> bool:
                             st.error("Usuário ou senha incorretos.")
 
                 st.write("")
-                if st.button("🔑 Esqueci minha senha", use_container_width=True):
+                if st.button("Esqueci minha senha", use_container_width=True):
                     st.session_state.modo_recuperacao_senha = True
                     st.rerun()
 
             else:
-                st.markdown("### 🔑 Redefinir Senha")
+                st.markdown("### Redefinir Senha")
                 st.caption("Informe seu usuário e o **PIN Mestre de Recuperação** para cadastrar uma nova senha.")
 
                 with st.form("form_recuperar_senha", clear_on_submit=True):
@@ -343,7 +342,7 @@ def verificar_autenticacao() -> bool:
                                 st.error(f"Não foi possível salvar a nova senha: {e}")
 
                 st.write("")
-                if st.button("← Voltar para o Login", use_container_width=True):
+                if st.button("Voltar para o Login", use_container_width=True):
                     st.session_state.modo_recuperacao_senha = False
                     st.rerun()
 
@@ -354,7 +353,7 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE + AVATAR) ---
+# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE + AVATAR AMPLIADO) ---
 st.markdown(
     """
     <style>
@@ -371,25 +370,25 @@ st.markdown(
     .perfil-header {
         display: flex;
         align-items: center;
-        gap: 0.9rem;
+        gap: 1.2rem;
         margin-top: 0.25rem;
-        margin-bottom: 0.65rem;
+        margin-bottom: 1rem;
     }
     .perfil-avatar {
-        width: 58px;
-        height: 58px;
-        min-width: 58px;
+        width: 84px;
+        height: 84px;
+        min-width: 84px;
         border-radius: 50%;
         object-fit: cover;
         object-position: center 20%;
-        border: 2px solid #2563EB;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        border: 3px solid #2563EB;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
         display: block;
     }
     .perfil-avatar-placeholder {
-        width: 58px;
-        height: 58px;
-        min-width: 58px;
+        width: 84px;
+        height: 84px;
+        min-width: 84px;
         border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #16A34A);
         color: white;
@@ -397,7 +396,8 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 1.35rem;
+        font-size: 2rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
     }
     .perfil-texto {
         display: flex;
@@ -405,16 +405,29 @@ st.markdown(
         justify-content: center;
     }
     .perfil-saudacao {
-        font-size: 0.92rem;
-        opacity: 0.8;
-        margin: 0 0 2px 0;
+        font-size: 1.1rem;
+        opacity: 0.82;
+        margin: 0 0 3px 0;
         line-height: 1.2;
     }
     .perfil-nome {
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.75rem;
+        font-weight: 700;
         margin: 0;
-        line-height: 1.25;
+        line-height: 1.2;
+    }
+    .badge-cat {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .badge-prof {
+        background-color: #2563EB;
+    }
+    .badge-pess {
+        background-color: #16A34A;
     }
     /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
@@ -424,17 +437,24 @@ st.markdown(
             padding-right: 0.65rem !important;
         }
         h1 {
-            font-size: 1.55rem !important;
+            font-size: 1.65rem !important;
             margin-bottom: 0.5rem !important;
         }
+        .perfil-header {
+            gap: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
         .perfil-avatar, .perfil-avatar-placeholder {
-            width: 48px;
-            height: 48px;
-            min-width: 48px;
-            font-size: 1.1rem;
+            width: 66px;
+            height: 66px;
+            min-width: 66px;
+            font-size: 1.55rem;
+        }
+        .perfil-saudacao {
+            font-size: 0.95rem;
         }
         .perfil-nome {
-            font-size: 1.1rem;
+            font-size: 1.35rem;
         }
         div[data-testid="stMetric"] {
             padding: 0.65rem 0.85rem !important;
@@ -671,7 +691,6 @@ def abrir_modal_perfil():
         help="Aceita JPG, JPEG, PNG, WEBP ou JFIF.",
     )
 
-    # Pré-visualização imediata da foto selecionada ou da foto atual
     preview_b64 = ""
     erro_imagem = None
     if nova_foto is not None:
@@ -686,8 +705,8 @@ def abrir_modal_perfil():
         st.error(erro_imagem)
     elif preview_b64:
         st.markdown(
-            f'<div style="display:flex; align-items:center; gap:0.75rem; margin: 0.5rem 0;">'
-            f'<img src="data:image/jpeg;base64,{preview_b64}" class="perfil-avatar" style="width:72px; height:72px; min-width:72px;">'
+            f'<div style="display:flex; align-items:center; gap:0.85rem; margin: 0.5rem 0;">'
+            f'<img src="data:image/jpeg;base64,{preview_b64}" class="perfil-avatar" style="width:84px; height:84px; min-width:84px;">'
             f'<span style="font-size:0.9rem; opacity:0.85;">Pré-visualização do avatar</span>'
             f"</div>",
             unsafe_allow_html=True,
@@ -755,25 +774,24 @@ def abrir_modal_evento(ev_clicado: dict):
 
     destino_maps = local_txt if local_txt else f"{titulo_ev}, Feira de Santana - BA"
 
-    cor_badge = "🔵" if categoria_ev == "Profissional" else "🟢"
     st.subheader(titulo_ev)
-    st.caption(f"{cor_badge} Agenda **{categoria_ev}**")
+    st.caption(f"Agenda: **{categoria_ev}**")
 
     st.markdown("---")
     c_ini, c_fim = st.columns(2)
     with c_ini:
         with st.container(border=True):
-            st.markdown(f"**🕒 Início**\n\n{inicio_fmt}")
+            st.markdown(f"**Início**\n\n{inicio_fmt}")
     with c_fim:
         with st.container(border=True):
-            st.markdown(f"**🏁 Término**\n\n{fim_fmt}")
+            st.markdown(f"**Término**\n\n{fim_fmt}")
 
     if local_txt:
         with st.container(border=True):
-            st.markdown(f"**📍 Endereço / Localização**\n\n{local_txt}")
+            st.markdown(f"**Endereço / Localização**\n\n{local_txt}")
 
     with st.container(border=True):
-        st.markdown("**📝 Observações / Detalhes**")
+        st.markdown("**Observações / Detalhes**")
         if descricao_txt:
             st.write(descricao_txt)
         else:
@@ -783,13 +801,13 @@ def abrir_modal_evento(ev_clicado: dict):
     col_maps, col_del = st.columns(2)
     with col_maps:
         st.link_button(
-            "🗺️ Abrir Rota no Google Maps",
+            "Abrir Rota no Google Maps",
             url=gerar_link_rota_maps(destino_maps),
             type="primary",
             use_container_width=True,
         )
     with col_del:
-        if st.button("🗑️ Excluir Evento", type="secondary", use_container_width=True):
+        if st.button("Excluir Evento", type="secondary", use_container_width=True):
             try:
                 excluir_evento(props["calendarId"], ev_clicado["id"])
                 st.toast("Evento removido do Google Agenda!")
@@ -822,7 +840,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.header("🎙️ Criação Rápida com IA")
+    st.header("Criação Rápida com IA")
     st.caption("Fale ou digite naturalmente. O evento é salvo automaticamente na agenda certa.")
 
     # 1. Entrada por Voz (Zero-Click Save)
@@ -847,7 +865,7 @@ with st.sidebar:
             "Ou digite em linguagem natural:",
             placeholder="Ex.: Agendamento no SAC amanhã às 10h",
         )
-        if st.form_submit_button("⚡ Agendar Texto", use_container_width=True):
+        if st.form_submit_button("Agendar Texto", use_container_width=True):
             if texto_rapido.strip():
                 with st.spinner("Interpretando e agendando..."):
                     try:
@@ -860,12 +878,12 @@ with st.sidebar:
     # Banner de confirmação + Botão Desfazer Último Evento
     if st.session_state.ultimo_evento_criado:
         ult = st.session_state.ultimo_evento_criado
-        msg_sucesso = f"✅ **{ult['titulo']}** ({ult['categoria']}) — {ult['inicio_fmt']}"
+        msg_sucesso = f"**{ult['titulo']}** ({ult['categoria']}) — {ult['inicio_fmt']}"
         if ult.get("localizacao"):
-            msg_sucesso += f"\n\n📍 {ult['localizacao']}"
+            msg_sucesso += f"\n\nLocal: {ult['localizacao']}"
         st.success(msg_sucesso)
 
-        if st.button("↩️ Desfazer Último Evento", type="secondary", use_container_width=True):
+        if st.button("Desfazer Último Evento", type="secondary", use_container_width=True):
             try:
                 excluir_evento(ult["calendar_id"], ult["event_id"])
                 st.session_state.ultimo_evento_criado = None
@@ -875,14 +893,14 @@ with st.sidebar:
                 st.error(f"Erro ao desfazer: {e}")
 
     st.markdown("---")
-    st.subheader("🎛️ Filtros de Visualização")
+    st.subheader("Filtros de Visualização")
     filtro_cat = st.radio(
         "Exibir:",
         ["Todas", "Profissional", "Pessoal"],
         horizontal=True,
     )
 
-    if st.button("🔄 Sincronizar Google Agenda", use_container_width=True):
+    if st.button("Sincronizar Google Agenda", use_container_width=True):
         carregar_eventos.clear()
         carregar_perfil_usuario.clear()
         st.session_state.data_foco_calendario = datetime.now(TZ).strftime("%Y-%m-%d")
@@ -890,7 +908,7 @@ with st.sidebar:
         st.rerun()
 
     # 3. Formulário Manual Completo
-    with st.expander("📝 Cadastro Manual Detalhado"):
+    with st.expander("Cadastro Manual Detalhado"):
         with st.form("form_manual", clear_on_submit=True):
             titulo_m = st.text_input("Título *")
             categoria_m = st.selectbox("Categoria", ["Profissional", "Pessoal"])
@@ -949,7 +967,7 @@ if nome_usuario or avatar_b64:
         unsafe_allow_html=True,
     )
 
-st.title("Meus agendamentos")
+st.title("My Diaries")
 
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
 
@@ -959,11 +977,11 @@ pess_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Pesso
 
 k1, k2, k3 = st.columns(3)
 k1.metric("Compromissos Hoje", len(eventos_hoje))
-k2.metric("🔵 Profissional (Período)", prof_count)
-k3.metric("🟢 Pessoal (Período)", pess_count)
+k2.metric("Profissional (Período)", prof_count)
+k3.metric("Pessoal (Período)", pess_count)
 
 # Barra rápida inline (facilita o uso no celular sem precisar abrir o menu lateral)
-with st.expander("🎙️ Novo agendamento rápido (Voz ou Texto)", expanded=False):
+with st.expander("Novo agendamento rápido (Voz ou Texto)", expanded=False):
     col_mob_voz, col_mob_txt = st.columns([1, 1.3])
     with col_mob_voz:
         audio_mob = st.audio_input("Gravar áudio", key="mic_input_mobile")
@@ -986,7 +1004,7 @@ with st.expander("🎙️ Novo agendamento rápido (Voz ou Texto)", expanded=Fal
                 "Ou escreva o compromisso:",
                 placeholder="Ex.: Dentista sexta às 15h",
             )
-            if st.form_submit_button("⚡ Agendar Agora", type="primary", use_container_width=True):
+            if st.form_submit_button("Agendar Agora", type="primary", use_container_width=True):
                 if texto_mob.strip():
                     with st.spinner("Agendando..."):
                         try:
