@@ -787,6 +787,16 @@ if (
 
 # --- BARRA LATERAL ---
 with st.sidebar:
+    # Ações de Conta no topo da barra lateral (apenas texto legível)
+    if st.button("Perfil", use_container_width=True):
+        abrir_modal_perfil()
+    if st.button("Alterar Senha", use_container_width=True):
+        abrir_modal_alterar_senha()
+    if st.button("Sair", use_container_width=True):
+        st.session_state["autenticado"] = False
+        st.rerun()
+
+    st.markdown("---")
     st.header("🎙️ Criação Rápida com IA")
     st.caption("Fale ou digite naturalmente. O evento é salvo automaticamente na agenda certa.")
 
@@ -887,19 +897,6 @@ with st.sidebar:
                         localizacao=local_m.strip(),
                     )
                     st.rerun()
-
-    st.markdown("---")
-    col_perf, col_pwd, col_out = st.columns(3)
-    with col_perf:
-        if st.button("👤 Perfil", use_container_width=True):
-            abrir_modal_perfil()
-    with col_pwd:
-        if st.button("🔐 Senha", use_container_width=True):
-            abrir_modal_alterar_senha()
-    with col_out:
-        if st.button("🚪 Sair", use_container_width=True):
-            st.session_state["autenticado"] = False
-            st.rerun()
 
 
 # --- ÁREA PRINCIPAL: PERFIL DO USUÁRIO, TÍTULO, KPIS E CALENDÁRIO ---
