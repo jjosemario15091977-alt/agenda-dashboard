@@ -353,41 +353,62 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS RESPONSIVOS + CABEÇALHO FIXO (STICKY) ---
+# --- ESTILOS RESPONSIVOS + CONGELAMENTO DO TOPO (ÁREA PRINCIPAL + SIDEBAR) ---
 st.markdown(
     """
     <style>
-    .block-container {
-        padding-top: 3.2rem !important;
-        padding-bottom: 2rem !important;
+    /* Desktop: congela o cabeçalho principal no topo e empurra o calendário para baixo */
+    @media (min-width: 769px) {
+        section[data-testid="stMain"] .block-container {
+            padding-top: 19.5rem !important;
+            padding-bottom: 2rem !important;
+        }
+        div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 21rem;
+            z-index: 99;
+            background-color: var(--background-color);
+            padding: 3.1rem 3rem 0.9rem 3rem;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+            transition: left 0.25s ease;
+        }
+        /* Ajusta automaticamente quando a barra lateral esquerda é recolhida */
+        body:has(section[data-testid="stSidebar"][aria-expanded="false"])
+            div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
+            left: 0;
+        }
+        /* Congela o bloco superior da barra lateral esquerda em sintonia com o cabeçalho */
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-sidebar-anchor) {
+            position: sticky;
+            top: 0;
+            z-index: 99;
+            background-color: var(--secondary-background-color);
+            padding-top: 0.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+            margin-bottom: 0.5rem;
+        }
     }
-    /* Fixa o cabeçalho superior (perfil, título e indicadores) ao rolar a página */
-    div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
-        position: sticky;
-        top: 2.85rem;
-        z-index: 90;
-        background-color: var(--background-color);
-        padding-top: 0.45rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 1px solid rgba(128, 128, 128, 0.18);
-        margin-bottom: 0.5rem;
-    }
+
     div[data-testid="stMetric"] {
         background-color: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 0.85rem 1.05rem;
+        border: 1px solid rgba(128, 128, 128, 0.18);
+        padding: 0.8rem 1rem;
         border-radius: 0.75rem;
     }
     .perfil-header {
         display: flex;
         align-items: center;
         gap: 1.1rem;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.25rem;
     }
     .perfil-avatar {
-        width: 76px;
-        height: 76px;
-        min-width: 76px;
+        width: 74px;
+        height: 74px;
+        min-width: 74px;
         border-radius: 50%;
         object-fit: cover;
         object-position: center 20%;
@@ -396,9 +417,9 @@ st.markdown(
         display: block;
     }
     .perfil-avatar-placeholder {
-        width: 76px;
-        height: 76px;
-        min-width: 76px;
+        width: 74px;
+        height: 74px;
+        min-width: 74px;
         border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #16A34A);
         color: white;
@@ -406,7 +427,7 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 1.85rem;
+        font-size: 1.8rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .perfil-texto {
@@ -415,28 +436,24 @@ st.markdown(
         justify-content: center;
     }
     .perfil-saudacao {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         opacity: 0.82;
         margin: 0 0 2px 0;
         line-height: 1.2;
     }
     .perfil-nome {
-        font-size: 1.65rem;
+        font-size: 1.6rem;
         font-weight: 700;
         margin: 0;
         line-height: 1.2;
     }
+
     /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 2.9rem !important;
+            padding-top: 3rem !important;
             padding-left: 0.65rem !important;
             padding-right: 0.65rem !important;
-        }
-        div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
-            top: 2.65rem;
-            padding-top: 0.35rem;
-            padding-bottom: 0.55rem;
         }
         h1 {
             font-size: 1.45rem !important;
@@ -832,16 +849,17 @@ if (
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    # Ações de Conta no topo da barra lateral (apenas texto legível)
-    if st.button("Perfil", use_container_width=True):
-        abrir_modal_perfil()
-    if st.button("Alterar Senha", use_container_width=True):
-        abrir_modal_alterar_senha()
-    if st.button("Sair", use_container_width=True):
-        st.session_state["autenticado"] = False
-        st.rerun()
+    # Bloco congelado no topo da barra lateral
+    with st.container():
+        st.markdown('<div id="sticky-sidebar-anchor"></div>', unsafe_allow_html=True)
+        if st.button("Perfil", use_container_width=True):
+            abrir_modal_perfil()
+        if st.button("Alterar Senha", use_container_width=True):
+            abrir_modal_alterar_senha()
+        if st.button("Sair", use_container_width=True):
+            st.session_state["autenticado"] = False
+            st.rerun()
 
-    st.markdown("---")
     st.header("Criação Rápida com IA")
     st.caption("Fale ou digite naturalmente. O evento é salvo automaticamente na agenda certa.")
 
@@ -944,7 +962,7 @@ with st.sidebar:
                     st.rerun()
 
 
-# --- ÁREA PRINCIPAL: CABEÇALHO FIXO (STICKY) ---
+# --- ÁREA PRINCIPAL: CABEÇALHO CONGELADO ---
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
 eventos_hoje = [e for e in eventos if e["start"].startswith(hoje_str)]
 prof_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Profissional")
