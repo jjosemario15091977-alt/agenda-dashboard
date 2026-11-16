@@ -229,12 +229,12 @@ def salvar_nova_senha_cofre(nova_senha: str):
 
 
 def processar_imagem_avatar(arquivo_upload) -> str:
-    """Redimensiona e comprime a foto enviada para um avatar leve em Base64."""
+    """Redimensiona e comprime a foto enviada priorizando o enquadramento do rosto."""
     img = Image.open(arquivo_upload)
     img = ImageOps.exif_transpose(img).convert("RGB")
-    img = ImageOps.fit(img, (160, 160), method=Image.Resampling.LANCZOS)
+    img = ImageOps.fit(img, (180, 180), method=Image.Resampling.LANCZOS, centering=(0.5, 0.25))
     buffer = io.BytesIO()
-    img.save(buffer, format="JPEG", quality=82, optimize=True)
+    img.save(buffer, format="JPEG", quality=85, optimize=True)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
@@ -266,7 +266,7 @@ def verificar_autenticacao() -> bool:
         """
         <style>
         .block-container {
-            padding-top: 2.5rem;
+            padding-top: 3.5rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
@@ -359,8 +359,8 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.75rem;
-        padding-bottom: 2rem;
+        padding-top: 3.5rem !important;
+        padding-bottom: 2rem !important;
     }
     div[data-testid="stMetric"] {
         background-color: rgba(255, 255, 255, 0.04);
@@ -371,20 +371,25 @@ st.markdown(
     .perfil-header {
         display: flex;
         align-items: center;
-        gap: 0.85rem;
-        margin-bottom: 0.35rem;
+        gap: 0.9rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.65rem;
     }
     .perfil-avatar {
-        width: 54px;
-        height: 54px;
+        width: 58px;
+        height: 58px;
+        min-width: 58px;
         border-radius: 50%;
         object-fit: cover;
+        object-position: center 20%;
         border: 2px solid #2563EB;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        display: block;
     }
     .perfil-avatar-placeholder {
-        width: 54px;
-        height: 54px;
+        width: 58px;
+        height: 58px;
+        min-width: 58px;
         border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #16A34A);
         color: white;
@@ -392,24 +397,29 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 1.25rem;
+        font-size: 1.35rem;
+    }
+    .perfil-texto {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     .perfil-saudacao {
-        font-size: 0.95rem;
-        opacity: 0.85;
-        margin: 0;
+        font-size: 0.92rem;
+        opacity: 0.8;
+        margin: 0 0 2px 0;
         line-height: 1.2;
     }
     .perfil-nome {
-        font-size: 1.2rem;
+        font-size: 1.25rem;
         font-weight: 600;
         margin: 0;
-        line-height: 1.3;
+        line-height: 1.25;
     }
     /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 1rem !important;
+            padding-top: 3.25rem !important;
             padding-left: 0.65rem !important;
             padding-right: 0.65rem !important;
         }
@@ -418,12 +428,13 @@ st.markdown(
             margin-bottom: 0.5rem !important;
         }
         .perfil-avatar, .perfil-avatar-placeholder {
-            width: 44px;
-            height: 44px;
-            font-size: 1.05rem;
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            font-size: 1.1rem;
         }
         .perfil-nome {
-            font-size: 1.05rem;
+            font-size: 1.1rem;
         }
         div[data-testid="stMetric"] {
             padding: 0.65rem 0.85rem !important;
@@ -648,42 +659,56 @@ def abrir_modal_perfil():
     perfil_atual = carregar_perfil_usuario()
     st.caption("Personalize o nome e a foto exibidos no topo do painel.")
 
-    if perfil_atual["avatar_b64"]:
+    novo_nome = st.text_input(
+        "Seu nome de exibição",
+        value=perfil_atual["nome"],
+        placeholder="Ex.: José Mário Júnior",
+    )
+
+    nova_foto = st.file_uploader(
+        "Escolher foto do computador ou celular",
+        accept_multiple_files=False,
+        help="Aceita JPG, JPEG, PNG, WEBP ou JFIF.",
+    )
+
+    # Pré-visualização imediata da foto selecionada ou da foto atual
+    preview_b64 = ""
+    erro_imagem = None
+    if nova_foto is not None:
+        try:
+            preview_b64 = processar_imagem_avatar(nova_foto)
+        except Exception as e:
+            erro_imagem = f"Arquivo inválido. Selecione uma imagem (JPG, PNG ou WEBP). Detalhe: {e}"
+    elif perfil_atual["avatar_b64"]:
+        preview_b64 = perfil_atual["avatar_b64"]
+
+    if erro_imagem:
+        st.error(erro_imagem)
+    elif preview_b64:
         st.markdown(
-            f'<div style="text-align:center; margin-bottom: 0.75rem;">'
-            f'<img src="data:image/jpeg;base64,{perfil_atual["avatar_b64"]}" class="perfil-avatar" style="width:84px; height:84px;">'
+            f'<div style="display:flex; align-items:center; gap:0.75rem; margin: 0.5rem 0;">'
+            f'<img src="data:image/jpeg;base64,{preview_b64}" class="perfil-avatar" style="width:72px; height:72px; min-width:72px;">'
+            f'<span style="font-size:0.9rem; opacity:0.85;">Pré-visualização do avatar</span>'
             f"</div>",
             unsafe_allow_html=True,
         )
 
-    with st.form("form_perfil_usuario", clear_on_submit=False):
-        novo_nome = st.text_input(
-            "Seu nome de exibição",
-            value=perfil_atual["nome"],
-            placeholder="Ex.: José Mário Júnior",
-        )
-        nova_foto = st.file_uploader(
-            "Enviar ou trocar foto (PNG, JPG ou WEBP)",
-            type=["png", "jpg", "jpeg", "webp"],
-        )
-        remover_foto = st.checkbox("Remover foto atual", value=False)
-        salvar_perfil_btn = st.form_submit_button("Salvar Perfil", type="primary", use_container_width=True)
+    remover_foto = st.checkbox("Remover foto atual", value=False)
 
-        if salvar_perfil_btn:
+    st.write("")
+    if st.button("Salvar Perfil", type="primary", use_container_width=True):
+        if erro_imagem:
+            st.warning("Corrija o arquivo de imagem antes de salvar.")
+        else:
             try:
                 with st.spinner("Salvando perfil..."):
-                    avatar_final = perfil_atual["avatar_b64"]
-                    if remover_foto:
-                        avatar_final = ""
-                    elif nova_foto is not None:
-                        avatar_final = processar_imagem_avatar(nova_foto)
-
+                    avatar_final = "" if remover_foto else preview_b64
                     _gravar_evento_cofre(
                         nome_exibicao=novo_nome.strip(),
                         avatar_b64=avatar_final,
                     )
                 st.success("Perfil atualizado!")
-                time_module.sleep(0.8)
+                time_module.sleep(0.7)
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao salvar perfil: {e}")
@@ -915,7 +940,7 @@ if nome_usuario or avatar_b64:
         f"""
         <div class="perfil-header">
             {avatar_html}
-            <div>
+            <div class="perfil-texto">
                 <p class="perfil-saudacao">Olá,</p>
                 <p class="perfil-nome">{texto_nome}</p>
             </div>
