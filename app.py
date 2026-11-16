@@ -353,50 +353,18 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS RESPONSIVOS + CONGELAMENTO DO TOPO (ÁREA PRINCIPAL + SIDEBAR) ---
+# --- ESTILOS RESPONSIVOS ---
 st.markdown(
     """
     <style>
-    /* Desktop: congela o cabeçalho principal no topo e empurra o calendário para baixo */
-    @media (min-width: 769px) {
-        section[data-testid="stMain"] .block-container {
-            padding-top: 19.5rem !important;
-            padding-bottom: 2rem !important;
-        }
-        div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
-            position: fixed;
-            top: 0;
-            right: 0;
-            left: 21rem;
-            z-index: 99;
-            background-color: var(--background-color);
-            padding: 3.1rem 3rem 0.9rem 3rem;
-            border-bottom: 1px solid rgba(128, 128, 128, 0.22);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-            transition: left 0.25s ease;
-        }
-        /* Ajusta automaticamente quando a barra lateral esquerda é recolhida */
-        body:has(section[data-testid="stSidebar"][aria-expanded="false"])
-            div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
-            left: 0;
-        }
-        /* Congela o bloco superior da barra lateral esquerda em sintonia com o cabeçalho */
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-sidebar-anchor) {
-            position: sticky;
-            top: 0;
-            z-index: 99;
-            background-color: var(--secondary-background-color);
-            padding-top: 0.25rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(128, 128, 128, 0.22);
-            margin-bottom: 0.5rem;
-        }
+    .block-container {
+        padding-top: 3.3rem !important;
+        padding-bottom: 1.5rem !important;
     }
-
     div[data-testid="stMetric"] {
-        background-color: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(128, 128, 128, 0.18);
-        padding: 0.8rem 1rem;
+        background-color: rgba(128, 128, 128, 0.06);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        padding: 0.75rem 1rem;
         border-radius: 0.75rem;
     }
     .perfil-header {
@@ -406,20 +374,20 @@ st.markdown(
         margin-bottom: 0.25rem;
     }
     .perfil-avatar {
-        width: 74px;
-        height: 74px;
-        min-width: 74px;
+        width: 72px;
+        height: 72px;
+        min-width: 72px;
         border-radius: 50%;
         object-fit: cover;
         object-position: center 20%;
         border: 3px solid #2563EB;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
         display: block;
     }
     .perfil-avatar-placeholder {
-        width: 74px;
-        height: 74px;
-        min-width: 74px;
+        width: 72px;
+        height: 72px;
+        min-width: 72px;
         border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #16A34A);
         color: white;
@@ -427,8 +395,8 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 1.8rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        font-size: 1.75rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
     }
     .perfil-texto {
         display: flex;
@@ -436,19 +404,17 @@ st.markdown(
         justify-content: center;
     }
     .perfil-saudacao {
-        font-size: 1.02rem;
+        font-size: 1rem;
         opacity: 0.82;
         margin: 0 0 2px 0;
         line-height: 1.2;
     }
     .perfil-nome {
-        font-size: 1.6rem;
+        font-size: 1.55rem;
         font-weight: 700;
         margin: 0;
         line-height: 1.2;
     }
-
-    /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
         .block-container {
             padding-top: 3rem !important;
@@ -459,15 +425,11 @@ st.markdown(
             font-size: 1.45rem !important;
             margin-bottom: 0.35rem !important;
         }
-        .perfil-header {
-            gap: 0.8rem;
-            margin-bottom: 0.25rem;
-        }
         .perfil-avatar, .perfil-avatar-placeholder {
-            width: 56px;
-            height: 56px;
-            min-width: 56px;
-            font-size: 1.35rem;
+            width: 54px;
+            height: 54px;
+            min-width: 54px;
+            font-size: 1.3rem;
         }
         .perfil-saudacao {
             font-size: 0.9rem;
@@ -849,120 +811,120 @@ if (
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    # Bloco congelado no topo da barra lateral
-    with st.container():
-        st.markdown('<div id="sticky-sidebar-anchor"></div>', unsafe_allow_html=True)
-        if st.button("Perfil", use_container_width=True):
-            abrir_modal_perfil()
-        if st.button("Alterar Senha", use_container_width=True):
-            abrir_modal_alterar_senha()
-        if st.button("Sair", use_container_width=True):
-            st.session_state["autenticado"] = False
-            st.rerun()
+    # Ações de Conta no topo da barra lateral (sempre visíveis acima da rolagem interna)
+    if st.button("Perfil", use_container_width=True):
+        abrir_modal_perfil()
+    if st.button("Alterar Senha", use_container_width=True):
+        abrir_modal_alterar_senha()
+    if st.button("Sair", use_container_width=True):
+        st.session_state["autenticado"] = False
+        st.rerun()
 
-    st.header("Criação Rápida com IA")
-    st.caption("Fale ou digite naturalmente. O evento é salvo automaticamente na agenda certa.")
+    st.markdown("---")
+    with st.container(height=520, border=False):
+        st.header("Criação Rápida com IA")
+        st.caption("Fale ou digite naturalmente. O evento é salvo automaticamente na agenda certa.")
 
-    # 1. Entrada por Voz (Zero-Click Save)
-    audio_gravado = st.audio_input("Falar compromisso", key="mic_input")
-    if audio_gravado is not None:
-        raw_bytes = audio_gravado.getvalue()
-        audio_hash = hashlib.md5(raw_bytes).hexdigest()
+        # 1. Entrada por Voz (Zero-Click Save)
+        audio_gravado = st.audio_input("Falar compromisso", key="mic_input")
+        if audio_gravado is not None:
+            raw_bytes = audio_gravado.getvalue()
+            audio_hash = hashlib.md5(raw_bytes).hexdigest()
 
-        if audio_hash != st.session_state.ultimo_audio_hash:
-            st.session_state.ultimo_audio_hash = audio_hash
-            with st.spinner("Ouvindo e agendando..."):
-                try:
-                    ev_extraido = processar_entrada_ia(audio_bytes=raw_bytes)
-                    salvar_evento_extraido(ev_extraido)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Não consegui processar o áudio: {e}")
-
-    # 2. Entrada Rápida por Texto
-    with st.form("form_texto_rapido", clear_on_submit=True):
-        texto_rapido = st.text_input(
-            "Ou digite em linguagem natural:",
-            placeholder="Ex.: Agendamento no SAC amanhã às 10h",
-        )
-        if st.form_submit_button("Agendar Texto", use_container_width=True):
-            if texto_rapido.strip():
-                with st.spinner("Interpretando e agendando..."):
+            if audio_hash != st.session_state.ultimo_audio_hash:
+                st.session_state.ultimo_audio_hash = audio_hash
+                with st.spinner("Ouvindo e agendando..."):
                     try:
-                        ev_extraido = processar_entrada_ia(texto=texto_rapido.strip())
+                        ev_extraido = processar_entrada_ia(audio_bytes=raw_bytes)
                         salvar_evento_extraido(ev_extraido)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao interpretar comando: {e}")
+                        st.error(f"Não consegui processar o áudio: {e}")
 
-    # Banner de confirmação + Botão Desfazer Último Evento
-    if st.session_state.ultimo_evento_criado:
-        ult = st.session_state.ultimo_evento_criado
-        msg_sucesso = f"**{ult['titulo']}** ({ult['categoria']}) — {ult['inicio_fmt']}"
-        if ult.get("localizacao"):
-            msg_sucesso += f"\n\nLocal: {ult['localizacao']}"
-        st.success(msg_sucesso)
+        # 2. Entrada Rápida por Texto
+        with st.form("form_texto_rapido", clear_on_submit=True):
+            texto_rapido = st.text_input(
+                "Ou digite em linguagem natural:",
+                placeholder="Ex.: Agendamento no SAC amanhã às 10h",
+            )
+            if st.form_submit_button("Agendar Texto", use_container_width=True):
+                if texto_rapido.strip():
+                    with st.spinner("Interpretando e agendando..."):
+                        try:
+                            ev_extraido = processar_entrada_ia(texto=texto_rapido.strip())
+                            salvar_evento_extraido(ev_extraido)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao interpretar comando: {e}")
 
-        if st.button("Desfazer Último Evento", type="secondary", use_container_width=True):
-            try:
-                excluir_evento(ult["calendar_id"], ult["event_id"])
-                st.session_state.ultimo_evento_criado = None
-                st.toast("Último evento removido!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao desfazer: {e}")
+        # Banner de confirmação + Botão Desfazer Último Evento
+        if st.session_state.ultimo_evento_criado:
+            ult = st.session_state.ultimo_evento_criado
+            msg_sucesso = f"**{ult['titulo']}** ({ult['categoria']}) — {ult['inicio_fmt']}"
+            if ult.get("localizacao"):
+                msg_sucesso += f"\n\nLocal: {ult['localizacao']}"
+            st.success(msg_sucesso)
 
-    st.markdown("---")
-    st.subheader("Filtros de Visualização")
-    filtro_cat = st.radio(
-        "Exibir:",
-        ["Todas", "Profissional", "Pessoal"],
-        horizontal=True,
-    )
-
-    if st.button("Sincronizar Google Agenda", use_container_width=True):
-        carregar_eventos.clear()
-        carregar_perfil_usuario.clear()
-        st.session_state.data_foco_calendario = datetime.now(TZ).strftime("%Y-%m-%d")
-        st.session_state.cal_reset_counter += 1
-        st.rerun()
-
-    # 3. Formulário Manual Completo
-    with st.expander("Cadastro Manual Detalhado"):
-        with st.form("form_manual", clear_on_submit=True):
-            titulo_m = st.text_input("Título *")
-            categoria_m = st.selectbox("Categoria", ["Profissional", "Pessoal"])
-            local_m = st.text_input("Local / Endereço (opcional)", placeholder="Ex.: SAC Feira II, Centro")
-            data_m = st.date_input("Data", value=datetime.now(TZ).date())
-
-            c1, c2 = st.columns(2)
-            with c1:
-                hora_ini_m = st.time_input("Início", value=time(9, 0))
-            with c2:
-                hora_fim_m = st.time_input("Término", value=time(10, 0))
-
-            lembrete_m = st.selectbox("Lembrete", list(LEMBRETES_OPCOES.keys()), index=2)
-            desc_m = st.text_area("Observações", height=60)
-
-            if st.form_submit_button("Salvar Manualmente", use_container_width=True):
-                if titulo_m.strip():
-                    dt_ini = datetime.combine(data_m, hora_ini_m, tzinfo=TZ)
-                    dt_fim = datetime.combine(data_m, hora_fim_m, tzinfo=TZ)
-                    if dt_fim <= dt_ini:
-                        dt_fim = dt_ini + timedelta(hours=1)
-                    criar_evento(
-                        categoria=categoria_m,
-                        titulo=titulo_m.strip(),
-                        descricao=desc_m.strip(),
-                        dt_inicio=dt_ini,
-                        dt_fim=dt_fim,
-                        overrides=LEMBRETES_OPCOES[lembrete_m],
-                        localizacao=local_m.strip(),
-                    )
+            if st.button("Desfazer Último Evento", type="secondary", use_container_width=True):
+                try:
+                    excluir_evento(ult["calendar_id"], ult["event_id"])
+                    st.session_state.ultimo_evento_criado = None
+                    st.toast("Último evento removido!")
                     st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao desfazer: {e}")
+
+        st.markdown("---")
+        st.subheader("Filtros de Visualização")
+        filtro_cat = st.radio(
+            "Exibir:",
+            ["Todas", "Profissional", "Pessoal"],
+            horizontal=True,
+        )
+
+        if st.button("Sincronizar Google Agenda", use_container_width=True):
+            carregar_eventos.clear()
+            carregar_perfil_usuario.clear()
+            st.session_state.data_foco_calendario = datetime.now(TZ).strftime("%Y-%m-%d")
+            st.session_state.cal_reset_counter += 1
+            st.rerun()
+
+        # 3. Formulário Manual Completo
+        with st.expander("Cadastro Manual Detalhado"):
+            with st.form("form_manual", clear_on_submit=True):
+                titulo_m = st.text_input("Título *")
+                categoria_m = st.selectbox("Categoria", ["Profissional", "Pessoal"])
+                local_m = st.text_input("Local / Endereço (opcional)", placeholder="Ex.: SAC Feira II, Centro")
+                data_m = st.date_input("Data", value=datetime.now(TZ).date())
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    hora_ini_m = st.time_input("Início", value=time(9, 0))
+                with c2:
+                    hora_fim_m = st.time_input("Término", value=time(10, 0))
+
+                lembrete_m = st.selectbox("Lembrete", list(LEMBRETES_OPCOES.keys()), index=2)
+                desc_m = st.text_area("Observações", height=60)
+
+                if st.form_submit_button("Salvar Manualmente", use_container_width=True):
+                    if titulo_m.strip():
+                        dt_ini = datetime.combine(data_m, hora_ini_m, tzinfo=TZ)
+                        dt_fim = datetime.combine(data_m, hora_fim_m, tzinfo=TZ)
+                        if dt_fim <= dt_ini:
+                            dt_fim = dt_ini + timedelta(hours=1)
+                        criar_evento(
+                            categoria=categoria_m,
+                            titulo=titulo_m.strip(),
+                            descricao=desc_m.strip(),
+                            dt_inicio=dt_ini,
+                            dt_fim=dt_fim,
+                            overrides=LEMBRETES_OPCOES[lembrete_m],
+                            localizacao=local_m.strip(),
+                        )
+                        st.rerun()
 
 
-# --- ÁREA PRINCIPAL: CABEÇALHO CONGELADO ---
+# --- ÁREA PRINCIPAL: CABEÇALHO CONGELADO NATURALMENTE NO TOPO ---
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
 eventos_hoje = [e for e in eventos if e["start"].startswith(hoje_str)]
 prof_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Profissional")
@@ -971,145 +933,143 @@ pess_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Pesso
 nome_usuario = perfil["nome"].strip()
 avatar_b64 = perfil["avatar_b64"].strip()
 
-with st.container():
-    st.markdown('<div id="sticky-header-anchor"></div>', unsafe_allow_html=True)
+if nome_usuario or avatar_b64:
+    if avatar_b64:
+        avatar_html = f'<img src="data:image/jpeg;base64,{avatar_b64}" class="perfil-avatar" alt="Foto do usuário">'
+    else:
+        inicial = nome_usuario[0].upper() if nome_usuario else "U"
+        avatar_html = f'<div class="perfil-avatar-placeholder">{inicial}</div>'
 
-    if nome_usuario or avatar_b64:
-        if avatar_b64:
-            avatar_html = f'<img src="data:image/jpeg;base64,{avatar_b64}" class="perfil-avatar" alt="Foto do usuário">'
-        else:
-            inicial = nome_usuario[0].upper() if nome_usuario else "U"
-            avatar_html = f'<div class="perfil-avatar-placeholder">{inicial}</div>'
-
-        texto_nome = nome_usuario if nome_usuario else "Bem-vindo"
-        st.markdown(
-            f"""
-            <div class="perfil-header">
-                {avatar_html}
-                <div class="perfil-texto">
-                    <p class="perfil-saudacao">Olá,</p>
-                    <p class="perfil-nome">{texto_nome}</p>
-                </div>
+    texto_nome = nome_usuario if nome_usuario else "Bem-vindo"
+    st.markdown(
+        f"""
+        <div class="perfil-header">
+            {avatar_html}
+            <div class="perfil-texto">
+                <p class="perfil-saudacao">Olá,</p>
+                <p class="perfil-nome">{texto_nome}</p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.title("My Diaries")
+st.title("My Diaries")
 
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Compromissos Hoje", len(eventos_hoje))
-    k2.metric("Profissional (Período)", prof_count)
-    k3.metric("Pessoal (Período)", pess_count)
+k1, k2, k3 = st.columns(3)
+k1.metric("Compromissos Hoje", len(eventos_hoje))
+k2.metric("Profissional (Período)", prof_count)
+k3.metric("Pessoal (Período)", pess_count)
 
+st.markdown("---")
 
-# --- CONTEÚDO ROLÁVEL: BARRA RÁPIDA E CALENDÁRIO ---
-with st.expander("Novo agendamento rápido (Voz ou Texto)", expanded=False):
-    col_mob_voz, col_mob_txt = st.columns([1, 1.3])
-    with col_mob_voz:
-        audio_mob = st.audio_input("Gravar áudio", key="mic_input_mobile")
-        if audio_mob is not None:
-            raw_bytes_mob = audio_mob.getvalue()
-            audio_hash_mob = hashlib.md5(raw_bytes_mob).hexdigest()
-            if audio_hash_mob != st.session_state.ultimo_audio_hash:
-                st.session_state.ultimo_audio_hash = audio_hash_mob
-                with st.spinner("Ouvindo e agendando..."):
-                    try:
-                        ev_extraido = processar_entrada_ia(audio_bytes=raw_bytes_mob)
-                        salvar_evento_extraido(ev_extraido)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao processar áudio: {e}")
-
-    with col_mob_txt:
-        with st.form("form_texto_rapido_mobile", clear_on_submit=True):
-            texto_mob = st.text_input(
-                "Ou escreva o compromisso:",
-                placeholder="Ex.: Dentista sexta às 15h",
-            )
-            if st.form_submit_button("Agendar Agora", type="primary", use_container_width=True):
-                if texto_mob.strip():
-                    with st.spinner("Agendando..."):
+# --- CONTEÚDO ROLÁVEL EM CONTÊINER DEDICADO (MANTÉM O TOPO CONGELADO) ---
+with st.container(height=680, border=False):
+    with st.expander("Novo agendamento rápido (Voz ou Texto)", expanded=False):
+        col_mob_voz, col_mob_txt = st.columns([1, 1.3])
+        with col_mob_voz:
+            audio_mob = st.audio_input("Gravar áudio", key="mic_input_mobile")
+            if audio_mob is not None:
+                raw_bytes_mob = audio_mob.getvalue()
+                audio_hash_mob = hashlib.md5(raw_bytes_mob).hexdigest()
+                if audio_hash_mob != st.session_state.ultimo_audio_hash:
+                    st.session_state.ultimo_audio_hash = audio_hash_mob
+                    with st.spinner("Ouvindo e agendando..."):
                         try:
-                            ev_extraido = processar_entrada_ia(texto=texto_mob.strip())
+                            ev_extraido = processar_entrada_ia(audio_bytes=raw_bytes_mob)
                             salvar_evento_extraido(ev_extraido)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro ao interpretar: {e}")
+                            st.error(f"Erro ao processar áudio: {e}")
 
-if filtro_cat != "Todas":
-    eventos_filtrados = [e for e in eventos if e["extendedProps"]["categoria"] == filtro_cat]
-else:
-    eventos_filtrados = eventos
+        with col_mob_txt:
+            with st.form("form_texto_rapido_mobile", clear_on_submit=True):
+                texto_mob = st.text_input(
+                    "Ou escreva o compromisso:",
+                    placeholder="Ex.: Dentista sexta às 15h",
+                )
+                if st.form_submit_button("Agendar Agora", type="primary", use_container_width=True):
+                    if texto_mob.strip():
+                        with st.spinner("Agendando..."):
+                            try:
+                                ev_extraido = processar_entrada_ia(texto=texto_mob.strip())
+                                salvar_evento_extraido(ev_extraido)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao interpretar: {e}")
 
-# Configuração responsiva do FullCalendar para caber perfeitamente no celular e no PC
-calendar_options = {
-    "editable": False,
-    "selectable": True,
-    "initialDate": st.session_state.data_foco_calendario,
-    "headerToolbar": {
-        "left": "today prev,next",
-        "center": "title",
-        "right": "dayGridMonth,listMonth",
-    },
-    "buttonText": {
-        "today": "Hoje",
-        "month": "Mês",
-        "list": "Lista",
-    },
-    "eventTimeFormat": {
-        "hour": "2-digit",
-        "minute": "2-digit",
-        "hour12": False,
-    },
-    "initialView": "dayGridMonth",
-    "locale": "pt-br",
-    "height": "auto",
-    "contentHeight": "auto",
-    "handleWindowResize": True,
-    "dayMaxEvents": 2,
-}
+    if filtro_cat != "Todas":
+        eventos_filtrados = [e for e in eventos if e["extendedProps"]["categoria"] == filtro_cat]
+    else:
+        eventos_filtrados = eventos
 
-custom_css_calendario = """
-    .fc .fc-toolbar {
-        flex-wrap: wrap;
-        gap: 0.4rem;
+    calendar_options = {
+        "editable": False,
+        "selectable": True,
+        "initialDate": st.session_state.data_foco_calendario,
+        "headerToolbar": {
+            "left": "today prev,next",
+            "center": "title",
+            "right": "dayGridMonth,listMonth",
+        },
+        "buttonText": {
+            "today": "Hoje",
+            "month": "Mês",
+            "list": "Lista",
+        },
+        "eventTimeFormat": {
+            "hour": "2-digit",
+            "minute": "2-digit",
+            "hour12": False,
+        },
+        "initialView": "dayGridMonth",
+        "locale": "pt-br",
+        "height": "auto",
+        "contentHeight": "auto",
+        "handleWindowResize": True,
+        "dayMaxEvents": 2,
     }
-    .fc .fc-toolbar-title {
-        font-size: 1.15rem !important;
-    }
-    .fc .fc-button {
-        padding: 0.25rem 0.55rem !important;
-        font-size: 0.85rem !important;
-    }
-    .fc .fc-daygrid-day-frame {
-        min-height: 58px !important;
-    }
-    @media (max-width: 600px) {
+
+    custom_css_calendario = """
+        .fc .fc-toolbar {
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
         .fc .fc-toolbar-title {
-            font-size: 1rem !important;
+            font-size: 1.15rem !important;
         }
-        .fc .fc-col-header-cell-cushion {
-            font-size: 0.75rem !important;
-            padding: 2px !important;
+        .fc .fc-button {
+            padding: 0.25rem 0.55rem !important;
+            font-size: 0.85rem !important;
         }
-        .fc .fc-daygrid-day-number {
-            font-size: 0.75rem !important;
-            padding: 2px 4px !important;
+        .fc .fc-daygrid-day-frame {
+            min-height: 58px !important;
         }
-        .fc-event-title, .fc-event-time {
-            font-size: 0.7rem !important;
+        @media (max-width: 600px) {
+            .fc .fc-toolbar-title {
+                font-size: 1rem !important;
+            }
+            .fc .fc-col-header-cell-cushion {
+                font-size: 0.75rem !important;
+                padding: 2px !important;
+            }
+            .fc .fc-daygrid-day-number {
+                font-size: 0.75rem !important;
+                padding: 2px 4px !important;
+            }
+            .fc-event-title, .fc-event-time {
+                font-size: 0.7rem !important;
+            }
         }
-    }
-"""
+    """
 
-estado_calendario = calendar(
-    events=eventos_filtrados,
-    options=calendar_options,
-    custom_css=custom_css_calendario,
-    callbacks=["eventClick"],
-    key=f"cal_{filtro_cat}_{st.session_state.data_foco_calendario}_{st.session_state.cal_reset_counter}",
-)
+    estado_calendario = calendar(
+        events=eventos_filtrados,
+        options=calendar_options,
+        custom_css=custom_css_calendario,
+        callbacks=["eventClick"],
+        key=f"cal_{filtro_cat}_{st.session_state.data_foco_calendario}_{st.session_state.cal_reset_counter}",
+    )
 
 # --- ABERTURA DO POP-UP AO CLICAR NO EVENTO (MÊS OU LISTA) ---
 if estado_calendario and estado_calendario.get("eventClick"):
