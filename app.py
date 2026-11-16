@@ -353,42 +353,52 @@ if not verificar_autenticacao():
     st.stop()
 
 
-# --- ESTILOS RESPONSIVOS (DESKTOP + MOBILE + AVATAR AMPLIADO) ---
+# --- ESTILOS RESPONSIVOS + CABEÇALHO FIXO (STICKY) ---
 st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 3.5rem !important;
+        padding-top: 3.2rem !important;
         padding-bottom: 2rem !important;
+    }
+    /* Fixa o cabeçalho superior (perfil, título e indicadores) ao rolar a página */
+    div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
+        position: sticky;
+        top: 2.85rem;
+        z-index: 90;
+        background-color: var(--background-color);
+        padding-top: 0.45rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+        margin-bottom: 0.5rem;
     }
     div[data-testid="stMetric"] {
         background-color: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 0.9rem 1.1rem;
+        padding: 0.85rem 1.05rem;
         border-radius: 0.75rem;
     }
     .perfil-header {
         display: flex;
         align-items: center;
-        gap: 1.2rem;
-        margin-top: 0.25rem;
-        margin-bottom: 1rem;
+        gap: 1.1rem;
+        margin-bottom: 0.35rem;
     }
     .perfil-avatar {
-        width: 84px;
-        height: 84px;
-        min-width: 84px;
+        width: 76px;
+        height: 76px;
+        min-width: 76px;
         border-radius: 50%;
         object-fit: cover;
         object-position: center 20%;
         border: 3px solid #2563EB;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         display: block;
     }
     .perfil-avatar-placeholder {
-        width: 84px;
-        height: 84px;
-        min-width: 84px;
+        width: 76px;
+        height: 76px;
+        min-width: 76px;
         border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #16A34A);
         color: white;
@@ -396,8 +406,8 @@ st.markdown(
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 2rem;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+        font-size: 1.85rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .perfil-texto {
         display: flex;
@@ -405,65 +415,57 @@ st.markdown(
         justify-content: center;
     }
     .perfil-saudacao {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         opacity: 0.82;
-        margin: 0 0 3px 0;
+        margin: 0 0 2px 0;
         line-height: 1.2;
     }
     .perfil-nome {
-        font-size: 1.75rem;
+        font-size: 1.65rem;
         font-weight: 700;
         margin: 0;
         line-height: 1.2;
     }
-    .badge-cat {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 6px;
-    }
-    .badge-prof {
-        background-color: #2563EB;
-    }
-    .badge-pess {
-        background-color: #16A34A;
-    }
     /* Ajustes específicos para telas de celular (largura até 768px) */
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 3.25rem !important;
+            padding-top: 2.9rem !important;
             padding-left: 0.65rem !important;
             padding-right: 0.65rem !important;
         }
+        div[data-testid="stVerticalBlock"]:has(> div.element-container #sticky-header-anchor) {
+            top: 2.65rem;
+            padding-top: 0.35rem;
+            padding-bottom: 0.55rem;
+        }
         h1 {
-            font-size: 1.65rem !important;
-            margin-bottom: 0.5rem !important;
+            font-size: 1.45rem !important;
+            margin-bottom: 0.35rem !important;
         }
         .perfil-header {
-            gap: 0.9rem;
-            margin-bottom: 0.75rem;
+            gap: 0.8rem;
+            margin-bottom: 0.25rem;
         }
         .perfil-avatar, .perfil-avatar-placeholder {
-            width: 66px;
-            height: 66px;
-            min-width: 66px;
-            font-size: 1.55rem;
-        }
-        .perfil-saudacao {
-            font-size: 0.95rem;
-        }
-        .perfil-nome {
+            width: 56px;
+            height: 56px;
+            min-width: 56px;
             font-size: 1.35rem;
         }
+        .perfil-saudacao {
+            font-size: 0.9rem;
+        }
+        .perfil-nome {
+            font-size: 1.25rem;
+        }
         div[data-testid="stMetric"] {
-            padding: 0.65rem 0.85rem !important;
+            padding: 0.55rem 0.75rem !important;
         }
         div[data-testid="stMetricValue"] {
-            font-size: 1.35rem !important;
+            font-size: 1.2rem !important;
         }
         div[data-testid="stMetricLabel"] {
-            font-size: 0.8rem !important;
+            font-size: 0.75rem !important;
         }
         iframe[title="streamlit_calendar.calendar"] {
             width: 100% !important;
@@ -942,45 +944,48 @@ with st.sidebar:
                     st.rerun()
 
 
-# --- ÁREA PRINCIPAL: PERFIL DO USUÁRIO, TÍTULO, KPIS E CALENDÁRIO ---
-nome_usuario = perfil["nome"].strip()
-avatar_b64 = perfil["avatar_b64"].strip()
-
-if nome_usuario or avatar_b64:
-    if avatar_b64:
-        avatar_html = f'<img src="data:image/jpeg;base64,{avatar_b64}" class="perfil-avatar" alt="Foto do usuário">'
-    else:
-        inicial = nome_usuario[0].upper() if nome_usuario else "U"
-        avatar_html = f'<div class="perfil-avatar-placeholder">{inicial}</div>'
-
-    texto_nome = nome_usuario if nome_usuario else "Bem-vindo"
-    st.markdown(
-        f"""
-        <div class="perfil-header">
-            {avatar_html}
-            <div class="perfil-texto">
-                <p class="perfil-saudacao">Olá,</p>
-                <p class="perfil-nome">{texto_nome}</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.title("My Diaries")
-
+# --- ÁREA PRINCIPAL: CABEÇALHO FIXO (STICKY) ---
 hoje_str = datetime.now(TZ).strftime("%Y-%m-%d")
-
 eventos_hoje = [e for e in eventos if e["start"].startswith(hoje_str)]
 prof_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Profissional")
 pess_count = sum(1 for e in eventos if e["extendedProps"]["categoria"] == "Pessoal")
 
-k1, k2, k3 = st.columns(3)
-k1.metric("Compromissos Hoje", len(eventos_hoje))
-k2.metric("Profissional (Período)", prof_count)
-k3.metric("Pessoal (Período)", pess_count)
+nome_usuario = perfil["nome"].strip()
+avatar_b64 = perfil["avatar_b64"].strip()
 
-# Barra rápida inline (facilita o uso no celular sem precisar abrir o menu lateral)
+with st.container():
+    st.markdown('<div id="sticky-header-anchor"></div>', unsafe_allow_html=True)
+
+    if nome_usuario or avatar_b64:
+        if avatar_b64:
+            avatar_html = f'<img src="data:image/jpeg;base64,{avatar_b64}" class="perfil-avatar" alt="Foto do usuário">'
+        else:
+            inicial = nome_usuario[0].upper() if nome_usuario else "U"
+            avatar_html = f'<div class="perfil-avatar-placeholder">{inicial}</div>'
+
+        texto_nome = nome_usuario if nome_usuario else "Bem-vindo"
+        st.markdown(
+            f"""
+            <div class="perfil-header">
+                {avatar_html}
+                <div class="perfil-texto">
+                    <p class="perfil-saudacao">Olá,</p>
+                    <p class="perfil-nome">{texto_nome}</p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.title("My Diaries")
+
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Compromissos Hoje", len(eventos_hoje))
+    k2.metric("Profissional (Período)", prof_count)
+    k3.metric("Pessoal (Período)", pess_count)
+
+
+# --- CONTEÚDO ROLÁVEL: BARRA RÁPIDA E CALENDÁRIO ---
 with st.expander("Novo agendamento rápido (Voz ou Texto)", expanded=False):
     col_mob_voz, col_mob_txt = st.columns([1, 1.3])
     with col_mob_voz:
